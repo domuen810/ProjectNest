@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ProjectNest.Api/ProjectNest.Api.csproj" />
+    <Project Path="src/ProjectNest.Application/ProjectNest.Application.csproj" />
+    <Project Path="src/ProjectNest.Domain/ProjectNest.Domain.csproj" />
+    <Project Path="src/ProjectNest.Infrastructure/ProjectNest.Infrastructure.csproj" />
+  </Folder>
+</Solution>
