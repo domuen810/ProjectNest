@@ -200,11 +200,11 @@ Store 1 ───── 0..* Project
 Example:
 
 ```text
-Zhengzhou Dennis
-├── Sisley Store
-├── Clarins Store
-├── Guerlain Store
-└── FANCL Store
+Mall A
+├── Brand A Store
+├── Brand B Store
+├── Brand C Store
+└── Brand D Store
 ```
 
 A Store may also have multiple Projects over time.
@@ -212,7 +212,7 @@ A Store may also have multiple Projects over time.
 Example:
 
 ```text
-Sisley — Zhengzhou Dennis
+Brand A — Mall A
 ├── New Store Project
 └── Later Renovation Project
 ```
