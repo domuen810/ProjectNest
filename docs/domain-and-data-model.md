@@ -195,17 +195,14 @@ Mall
 
 ## 3.3 Store
 
-A `Store` represents one specific Brand location within one Mall.
+A `Store` represents a Brand's operating presence within a specific Mall over one business lifecycle.
 
 ```text
 Store
 ├── Id
 ├── BrandId
 ├── MallId
-├── StoreLocation
-├── StoreTypeId
-├── CounterTypeId
-├── IsActive
+├── Status
 ├── CreatedAt
 └── UpdatedAt
 ```
@@ -214,87 +211,79 @@ Relationships:
 
 ```text
 Brand 1 ───── 0..* Store
-Mall  1 ───── 0..* Store
+Mall 1 ───── 0..* Store
 Store 1 ───── 0..* Project
 ```
 
-`Mall 1 ───── 0..* Store` means one Mall may contain multiple Stores belonging to different Brands handled by the company.
+A Store must be associated with one Brand and one Mall.
 
-Example:
+A Store represents one operating lifecycle of a Brand within a Mall.
 
-```text
-Mall A
-├── Brand A Store
-├── Brand B Store
-├── Brand C Store
-└── Brand D Store
-```
+If a Store is closed and the Brand later returns to the same Mall, a new Store is created rather than reopening the old Store.
 
-A Store may also have multiple Projects over time.
-
-Example:
+### Store Lifecycle
 
 ```text
-Brand A — Mall A
-├── New Store Project
-└── Later Renovation Project
+PreOpening → Open → Closed
 ```
 
-Store and Project are therefore separate business concepts.
+- New Stores normally start as `PreOpening`.
+- Existing Stores that are already trading may be created directly as `Open`.
+- `Closed` is a terminal state and cannot return to `Open`.
 
+`BrandId` and `MallId` are part of the Store's identity and are not normally changed after creation.
+
+A Store does not store a separate Store name.
+
+A display name can be generated dynamically from the related Brand and Mall, for example:
+
+```text
+Brand Name - Mall Name
+```
+
+#### Store and Project Modelling Rules
+
+A Store can have multiple Projects over time.
+
+Examples include:
+
+- Temporary counter project
+- Permanent counter project
+- Independent beauty room project
+- Renovation project
+
+Temporary and permanent counters are modelled as Projects rather than Store types.
+
+Counter shape is also modelled at Project level rather than Store level.
+
+Examples include:
+
+- Full Island
+- Half Island
+- Combined Counter
+- Wall Counter
+
+An integrated beauty room is treated as part of a Wall Counter Project.
+
+An independent beauty room is modelled as a separate Project under the same Store because it has its own location, drawings, schedule, and construction work.
+
+Island counters do not have integrated beauty rooms.
+
+Project-specific location information belongs to the Project rather than the Store.
+
+This includes:
+
+- Floor
+- Shop Number
+
+This allows Projects under the same Store to have different locations, for example:
+
+- Temporary counter on one floor
+- Permanent counter in another location
+- Independent beauty room on another floor
 ---
 
-## 3.4 StoreType
-
-Store Type varies by Brand.
-
-Some Brands have Brand-specific classifications. Others use a standard department-store counter type.
-
-```text
-StoreType
-├── Id
-├── BrandId?
-├── Name
-└── IsActive
-```
-
-A shared value is available:
-
-```text
-Standard Counter
-```
-
-`BrandId = null` may represent a shared/global Store Type.
-
----
-
-## 3.5 CounterType
-
-Counter Type is controlled reference data.
-
-Typical hierarchy:
-
-```text
-Wall Counter
-
-Island Counter
-├── Peninsula
-└── Full Island
-```
-
-Model:
-
-```text
-CounterType
-├── Id
-├── Name
-├── ParentCounterTypeId?
-└── IsActive
-```
-
----
-
-## 3.6 Project
+## 3.4 Project
 
 A `Project` represents one fit-out project carried out for a Store.
 
@@ -335,7 +324,7 @@ Temporary Counter is a Project requirement, not a ProjectType.
 
 ---
 
-## 3.7 Project Status
+## 3.5 Project Status
 
 ```text
 ProjectStatus
@@ -360,7 +349,7 @@ Cancelled Projects are retained rather than deleted.
 
 ---
 
-## 3.8 ProjectStatusChange
+## 3.6 ProjectStatusChange
 
 Project status history is retained separately.
 
@@ -394,7 +383,7 @@ Existing Survey, Drawing, Production and File records remain available regardles
 
 ---
 
-## 3.9 Payment Arrangement
+## 3.7 Payment Arrangement
 
 Payment Arrangement is Project-owned structured data rather than a separate Entity.
 
@@ -428,7 +417,7 @@ Shared
 
 ---
 
-## 3.10 Temporary Counter Requirement
+## 3.8 Temporary Counter Requirement
 
 Temporary Counter is represented directly on Project:
 
@@ -441,7 +430,7 @@ The operational Temporary Counter workflow remains outside the MVP.
 
 ---
 
-## 3.11 Project Contacts
+## 3.9 Project Contacts
 
 ProjectNest does not implement a full contact-management system.
 
