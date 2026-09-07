@@ -135,6 +135,17 @@ Brand 1 ───── 0..* SavedContact
 
 A Brand may operate multiple Stores across different Malls and cities.
 
+### Brand — Rules Outside the Entity
+
+1. Brand Name must be globally unique.
+2. Brand Name uniqueness must be case-insensitive.
+3. Leading and trailing whitespace must be ignored when checking uniqueness.
+4. A Project can only be created using an Active Brand.
+
+#### Implementation Responsibility
+
+- Application layer: validate these business conditions.
+- Database: add uniqueness protection where appropriate.
 ---
 
 ## 3.2 Mall
@@ -144,8 +155,8 @@ A `Mall` represents a specific mall location.
 In real business usage, the Mall name may already include its city, for example:
 
 ```text
-Zhengzhou Dennis
-Luoyang Dennis
+City A Mall A
+City B Mall A
 ```
 
 However, the system identifies and relates Mall records through:
@@ -168,6 +179,18 @@ Mall
 
 `Mall.Name` is display/business data, not the relational identity.
 
+### Mall — Rules Outside the Entity
+
+1. Mall uniqueness is based on City + Name, not Name alone.
+   Different cities may have Malls with the same name.
+
+2. Historical Projects must retain the Mall name used at the time so that it remains consistent with related drawings and other project files.
+
+#### Implementation Responsibility
+
+- Application layer: validate Mall duplicate conditions.
+- Database: enforce uniqueness for the City + Name combination where appropriate.
+- Project: store a Mall name snapshot to preserve historical consistency.
 ---
 
 ## 3.3 Store
