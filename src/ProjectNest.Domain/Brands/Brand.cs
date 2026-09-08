@@ -4,19 +4,26 @@ public class Brand
 {
     public Guid Id { get; private set; }
     public string Name { get; private set; } = string.Empty;
+    public string Code { get; private set; } = string.Empty;
     public bool IsActive { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
-    public Brand(string name)
+    public Brand(string name, string code)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
             throw new ArgumentException("Brand name is required.", nameof(name));
         }
 
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            throw new ArgumentException("Brand code is required.", nameof(code));
+        }
+
         Id = Guid.NewGuid();
         Name = name.Trim();
+        Code = code.Trim().ToUpperInvariant();
         IsActive = true;
         CreatedAt = DateTime.UtcNow;
         UpdatedAt = DateTime.UtcNow;
