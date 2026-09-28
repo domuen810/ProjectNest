@@ -21,9 +21,9 @@ public class Project
     public string MallNameSnapshot { get; private set; }
     public string? BrandContactName { get; private set; }
     public string? BrandContactEmail { get; private set; }
-    public string MallContactName { get; private set; }
+    public string? MallContactName { get; private set; }
     public string? MallContactRole { get; private set; }
-    public string MallContactPhone { get; private set; }
+    public string? MallContactPhone { get; private set; }
     public string? MallContactEmail { get; private set; }
     public CounterType? CounterType { get; private set; }
     public bool? HasIntegratedBeautyRoom { get; private set; }
@@ -42,8 +42,8 @@ public class Project
 
     public Project(
         string projectNumber, Guid storeId, ProjectType projectType, DateOnly openingDate,
-        string brandNameSnapshot, string mallNameSnapshot, string mallContactName,
-        string mallContactPhone, Guid createdByUserId,
+        string brandNameSnapshot, string mallNameSnapshot, Guid createdByUserId,
+        string? mallContactName = null, string? mallContactPhone = null,
         CounterType? counterType = null, bool? hasIntegratedBeautyRoom = null,
         bool? hasExistingCounter = null,
         ExistingCounterLocationRelation? existingCounterLocationRelation = null,
@@ -65,8 +65,8 @@ public class Project
         RequireOpeningDate(openingDate);
         BrandNameSnapshot = RequiredText(brandNameSnapshot, nameof(brandNameSnapshot));
         MallNameSnapshot = RequiredText(mallNameSnapshot, nameof(mallNameSnapshot));
-        MallContactName = RequiredText(mallContactName, nameof(mallContactName));
-        MallContactPhone = RequiredText(mallContactPhone, nameof(mallContactPhone));
+        MallContactName = OptionalText(mallContactName);
+        MallContactPhone = OptionalText(mallContactPhone);
         ValidateOptionalId(responsibleDesignerId, nameof(responsibleDesignerId));
 
         ProjectType = projectType;
