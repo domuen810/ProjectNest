@@ -15,6 +15,9 @@ public sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
             table.HasCheckConstraint(
                 "CK_Projects_PaymentShares",
                 "\"BrandPaymentPercentage\" BETWEEN 0 AND 100 AND \"MallPaymentPercentage\" BETWEEN 0 AND 100 AND \"BrandPaymentPercentage\" + \"MallPaymentPercentage\" = 100");
+            table.HasCheckConstraint(
+                "CK_Projects_CounterTypeByCategory",
+                $"(\"ProjectCategory\" = {(int)ProjectCategory.PermanentCounter} AND \"CounterType\" IS NOT NULL) OR (\"ProjectCategory\" <> {(int)ProjectCategory.PermanentCounter} AND \"CounterType\" IS NULL)");
         });
         builder.HasKey(project => project.Id);
 
@@ -28,6 +31,7 @@ public sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
         builder.Property(project => project.BrandNameSnapshot).IsRequired();
         builder.Property(project => project.MallNameSnapshot).IsRequired();
         builder.Property(project => project.RequiresTemporaryCounter).IsRequired();
+        builder.Property(project => project.HasExistingCounter).IsRequired();
         builder.Property(project => project.RequiresExistingCounterRemoval).IsRequired();
         builder.Property(project => project.Status).IsRequired();
         builder.Property(project => project.CreatedByUserId).IsRequired();

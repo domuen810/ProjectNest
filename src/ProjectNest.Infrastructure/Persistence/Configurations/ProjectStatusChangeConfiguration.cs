@@ -9,7 +9,12 @@ public sealed class ProjectStatusChangeConfiguration : IEntityTypeConfiguration<
 {
     public void Configure(EntityTypeBuilder<ProjectStatusChange> builder)
     {
-        builder.ToTable("ProjectStatusChanges");
+        builder.ToTable("ProjectStatusChanges", table =>
+        {
+            table.HasCheckConstraint(
+                "CK_ProjectStatusChanges_ReasonForPausedOrCancelled",
+                $"\"NewStatus\" NOT IN ({(int)ProjectStatus.Paused}, {(int)ProjectStatus.Cancelled}) OR (\"Reason\" IS NOT NULL AND regexp_replace(\"Reason\", '^[[:space:]]+|[[:space:]]+$', '', 'g') <> '')");
+        });
         builder.HasKey(change => change.Id);
 
         builder.Property(change => change.ProjectId).IsRequired();

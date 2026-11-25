@@ -10,7 +10,12 @@ public sealed class DrawingRevisionConfiguration : IEntityTypeConfiguration<Draw
 {
     public void Configure(EntityTypeBuilder<DrawingRevision> builder)
     {
-        builder.ToTable("DrawingRevisions");
+        builder.ToTable("DrawingRevisions", table =>
+        {
+            table.HasCheckConstraint(
+                "CK_DrawingRevisions_AffectedPagesForPartial",
+                $"\"ChangeScope\" <> {(int)DrawingChangeScope.Partial} OR (\"AffectedPagesOrAreas\" IS NOT NULL AND regexp_replace(\"AffectedPagesOrAreas\", '^[[:space:]]+|[[:space:]]+$', '', 'g') <> '')");
+        });
         builder.HasKey(revision => revision.Id);
 
         builder.Property(revision => revision.ProjectId).IsRequired();
