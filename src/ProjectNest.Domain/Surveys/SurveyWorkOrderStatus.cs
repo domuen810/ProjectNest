@@ -2,7 +2,8 @@ namespace ProjectNest.Domain.Surveys;
 
 public enum SurveyWorkOrderStatus
 {
-    Scheduled,
+    Planned,
+    InProgress,
     Completed,
     Cancelled
 }

@@ -23,9 +23,9 @@ public class Store
             throw new ArgumentException("Mall is required.", nameof(mallId));
         }
 
-        if (status == StoreStatus.Closed)
+        if (!Enum.IsDefined(status) || status == StoreStatus.Closed)
         {
-            throw new ArgumentException("A Store cannot be created as Closed.", nameof(status));
+            throw new ArgumentException("A Store must be created as PreOpening or Open.", nameof(status));
         }
 
         Id = Guid.NewGuid();

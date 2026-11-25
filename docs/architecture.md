@@ -40,7 +40,7 @@ ProjectNest consists of the following main components:
 - **Frontend** — React and TypeScript single-page application used by internal users.
 - **Backend** — ASP.NET Core Web API containing the application and business logic.
 - **Database** — PostgreSQL stores structured application data.
-- **File Storage** — Object storage stores project files such as drawing PDFs, CAD files and survey documents.
+- **File Storage** — The file system or equivalent storage holds project binaries such as drawing PDFs, CAD files and survey documents; `StoredFile` metadata and business associations are retained in PostgreSQL.
 
 The main communication flow is:
 
@@ -72,11 +72,11 @@ Modular Monolith
 
 The backend is divided into business modules with clear responsibilities:
 
-- **Identity** — User identity, authentication and role-based access.
+- **Identity** — User identity, authentication and simple RBAC. SystemRole uses a predefined catalog and has a many-to-many association with Users; JobPosition uses a separate predefined catalog, with exactly one required position per User.
 - **Projects** — Core project information, project status and responsible Designer assignment.
 - **Surveys** — Site Survey Work Orders, survey assignments and survey records.
-- **Drawings** — Drawing sets, revisions, drawing changes and identification of the current production drawing.
-- **Production** — Production orders, production stages and production progress.
+- **Drawings** — Project-scoped DrawingRevisions, revision/change history and identification of the current production drawing. DrawingSet is not a separate entity.
+- **Production** — Production orders and progress recorded per Workshop.
 
 Modules may collaborate as part of a business workflow, but each module remains responsible for its own business rules and data.
 
@@ -84,7 +84,7 @@ Modules may collaborate as part of a business workflow, but each module remains 
 
 ProjectNest uses **PostgreSQL** as the primary relational database for structured application data.
 
-Large project files, such as drawing PDFs, CAD files and survey documents, are stored separately in object storage. PostgreSQL stores the metadata and references required to associate these files with the relevant business records.
+Large project files, such as drawing PDFs, CAD files and survey documents, are stored separately in the file system or equivalent storage. PostgreSQL stores `StoredFile` metadata and the references required to associate files with records such as `DrawingRevision` and `SurveyVisit`. Each DrawingRevision must reference at least one StoredFile and may reference multiple files. The MVP does not mandate a specific storage provider.
 
 This approach avoids storing large binary files directly in the relational database while keeping file information connected to projects, surveys and drawings.
 
@@ -92,12 +92,13 @@ This approach avoids storing large binary files directly in the relational datab
 
 ProjectNest is an internal system and requires authenticated access.
 
-Authentication is handled using ASP.NET Core Identity. Authorization is based on user roles and, where required, resource-specific rules.
+Authentication is handled using ASP.NET Core Identity. The MVP uses simple RBAC. A User's business Job Position is separate from their System Role; job titles are not authorization roles. Any later resource-specific authorization must not collapse these concepts.
 
 The initial access model follows these principles:
 
 - Users must be authenticated before accessing protected project information.
-- Role-based access control is used to restrict actions according to business responsibilities.
+- SystemRole-based access control restricts actions. The SystemRole catalog is predefined and users cannot create roles; a User may hold multiple SystemRoles.
+- Each User has exactly one required JobPosition from its separate predefined catalog. Job Position is business information and does not itself grant permissions.
 - Users should only be given the permissions required for their role.
 - Sensitive configuration and secrets must not be stored directly in source code.
 - Access to project files must be controlled through the application rather than exposed publicly.

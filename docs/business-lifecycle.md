@@ -19,34 +19,27 @@ ProjectNest — Full Business Lifecycle
 │   │   │   ├── Brand
 │   │   │   ├── City
 │   │   │   ├── Mall
-│   │   │   ├── Mall Type: New / Existing
+│   │   │   ├── Mall Type: New / Existing (descriptive only; not currently modeled in the Domain or used by MVP workflows)
 │   │   │   ├── Store Location
 │   │   │   ├── Area
 │   │   │   ├── Opening Date
 │   │   │   ├── Client Contact
 │   │   │   ├── Mall Contact
-│   │   │   ├── Store Type
-│   │   │   │   ├── Brand-specific type when applicable
-│   │   │   │   └── Standard Counter when no specific type applies
-│   │   │   ├── Counter Type
-│   │   │   │   ├── Wall Counter
-│   │   │   │   └── Island Counter
-│   │   │   │       ├── Peninsula
-│   │   │   │       └── Full Island
-│   │   │   ├── Project Type
-│   │   │   │   ├── New Store
-│   │   │   │   └── Renovation
-│   │   │   ├── Payment Arrangement
-│   │   │   │   ├── Mall 100%
-│   │   │   │   ├── Brand 100%
-│   │   │   │   └── Mall / Brand Shared
+│   │   │   ├── Project Nature: New / Renovation
+│   │   │   ├── Project Category: Permanent Counter / Independent Beauty Room
+│   │   │   ├── Counter Type for Permanent Counter: Full Island / Half Island / Combined Counter / Wall Counter
+│   │   │   ├── Temporary Counter: optional configuration of a Permanent Counter Project
+│   │   │   ├── Brand and Mall payment percentages, totaling 100%
 │   │   │   ├── Temporary Counter Requirement: Yes / No
 │   │   │   ├── Temporary Counter Notes
 │   │   │   ├── Initial Requirements
 │   │   │   └── Mall Drawings / Reference Files
 │   │   ├── Team Manager receives project
 │   │   ├── Team Manager Assistant creates project
-│   │   └── Responsible Designer assigned
+│   │   ├── Project may initially have no responsible Designer
+│   │   ├── Responsible Designer can be assigned later; assignment changes are retained
+│   │   │   ├── Project.ResponsibleDesignerId stores the current responsible Designer
+│   │   │   └── ProjectAssignment records ProjectId, DesignerUserId, AssignedAt, EndedAt and AssignedByUserId
 │   │
 │   ├── 3. Initial Planning & Coordination
 │   │   ├── Opening Date drives initial schedule
@@ -60,16 +53,15 @@ ProjectNest — Full Business Lifecycle
 │   │   ├── Designer identifies missing or unclear information to verify on site
 │   │   ├── Team Manager Assistant creates Site Survey Work Order
 │   │   ├── Mall Contact is contacted to arrange survey
-│   │   └── Engineering assigns Survey Personnel
+│   │   └── Engineering coordinates Survey Personnel for the visit
 │   │
 │   ├── 5. Initial Site Survey
 │   │   ├── Initial Survey may require one or multiple Survey Visits
 │   │   │
 │   │   ├── Each Survey Visit records:
 │   │   │   ├── Visit Date
-│   │   │   ├── Survey Personnel
+│   │   │   ├── Survey Personnel (name and phone; not linked to User)
 │   │   │   ├── Completion Status
-│   │   │   ├── Incomplete Reason, when applicable
 │   │   │   ├── Findings / Notes
 │   │   │   ├── Survey Source Materials
 │   │   │   │   ├── Site Photos
@@ -79,6 +71,7 @@ ProjectNest — Full Business Lifecycle
 │   │   │   │   └── Other Supporting Files
 │   │   │   └── Survey Visit Report
 │   │   │
+│   │   ├── Survey Work Order and Visit statuses: Planned, InProgress, Completed, Cancelled
 │   │   ├── Survey Personnel may differ between Survey Visits
 │   │   ├── Additional Survey Visits arranged when required
 │   │   ├── Each Survey Visit Report retained
@@ -110,7 +103,7 @@ ProjectNest — Full Business Lifecycle
 │   │   ├── Mall reviews design
 │   │   ├── Designer makes required revisions
 │   │   ├── Design resubmitted when required
-│   │   └── Final Mall-signed Drawing Set retained
+│   │   └── Final Mall-signed DrawingRevision package retained (no separate DrawingSet entity)
 │   │
 │   ├── 9. Construction Drawing Development
 │   │   ├── Mall-signed drawings returned to Brand for review
@@ -138,23 +131,25 @@ ProjectNest — Full Business Lifecycle
 │   ├── 12. Final Order Drawing & Factory Order
 │   │   ├── Designer performs final check
 │   │   ├── Final Order Drawing confirmed
-│   │   ├── Final drawings uploaded to ProjectNest
+│   │   ├── Final drawing revision and associated files uploaded to ProjectNest
 │   │   ├── Final drawings issued to Factory
 │   │   └── Factory uses Final Order Drawing as production basis
 │   │
 │   ├── 13. Factory Production
 │   │   ├── Factory Manager schedules production
 │   │   ├── Production stages may include:
-│   │   │   ├── Woodwork
-│   │   │   ├── Metalwork
+│   │   │   ├── Carpentry
 │   │   │   ├── Painting
+│   │   │   ├── Glass
+│   │   │   ├── Metal
 │   │   │   ├── Electrical
-│   │   │   ├── Glass / Acrylic
-│   │   │   ├── Hardware Installation
 │   │   │   ├── Pre-assembly
-│   │   │   └── Packing
-│   │   ├── Production stages may overlap
-│   │   └── Production progress updated
+│   │   │   └── Packing & Shipping
+│   │   ├── Each ProductionOrder has one progress record per Workshop
+│   │   ├── Workshop progress can start independently and may overlap
+│   │   ├── ProductionProgressHistory records previous/new status, time and changing User
+│   │   ├── ProductionStageProgress retains the current status
+│   │   └── ReworkRecord independently retains rework history
 │   │
 │   └── 14. Production Drawing Changes
 │       ├── Drawing changes may result from:
@@ -166,7 +161,8 @@ ProjectNest — Full Business Lifecycle
 │       │   ├── Revised sheets / pages / areas uploaded
 │       │   └── Affected areas recorded
 │       ├── Wider / related change
-│       │   └── Updated complete CAD + PDF Drawing Set uploaded
+│       │   └── Updated CAD + PDF drawing package uploaded as DrawingRevision files
+│       ├── Each DrawingRevision has at least one StoredFile; multiple files are allowed
 │       ├── Previous revisions retained
 │       └── Current Production Drawing maintained
 │

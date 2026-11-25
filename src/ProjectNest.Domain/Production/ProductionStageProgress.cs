@@ -2,12 +2,14 @@ namespace ProjectNest.Domain.Production;
 
 public class ProductionStageProgress
 {
+    private readonly List<ProductionProgressHistory> statusHistory = new();
     private readonly List<ReworkRecord> reworkHistory = new();
 
     public Guid Id { get; private set; }
     public Guid ProductionOrderId { get; private set; }
     public Guid WorkshopId { get; private set; }
     public ProductionStageStatus Status { get; private set; }
+    public IReadOnlyList<ProductionProgressHistory> StatusHistory => statusHistory.AsReadOnly();
     public IReadOnlyList<ReworkRecord> ReworkHistory => reworkHistory.AsReadOnly();
 
     public ProductionStageProgress(Guid productionOrderId, Guid workshopId)
@@ -20,16 +22,28 @@ public class ProductionStageProgress
         Status = ProductionStageStatus.NotStarted;
     }
 
-    public void Start()
+    public void Start(Guid changedByUserId)
     {
         RequireStatus(ProductionStageStatus.NotStarted);
-        Status = ProductionStageStatus.InProgress;
+        ChangeStatus(ProductionStageStatus.InProgress, changedByUserId);
     }
 
-    public void Complete()
+    public void Complete(Guid changedByUserId)
     {
         RequireStatus(ProductionStageStatus.InProgress);
-        Status = ProductionStageStatus.Completed;
+        ChangeStatus(ProductionStageStatus.Completed, changedByUserId);
+    }
+
+    public void Block(Guid changedByUserId)
+    {
+        RequireStatus(ProductionStageStatus.InProgress);
+        ChangeStatus(ProductionStageStatus.Blocked, changedByUserId);
+    }
+
+    public void ResumeFromBlocked(Guid changedByUserId)
+    {
+        RequireStatus(ProductionStageStatus.Blocked);
+        ChangeStatus(ProductionStageStatus.InProgress, changedByUserId);
     }
 
     public void RecordRework(ReworkReasonType reasonType, Guid recordedByUserId, string? note = null)
@@ -42,7 +56,17 @@ public class ProductionStageProgress
         var record = new ReworkRecord(Id, reasonType, recordedByUserId, note);
         // Rework reopens completed workshop work and appends to, rather than replaces, its history.
         reworkHistory.Add(record);
-        Status = ProductionStageStatus.InProgress;
+        ChangeStatus(ProductionStageStatus.InProgress, recordedByUserId);
+    }
+
+    private void ChangeStatus(ProductionStageStatus newStatus, Guid changedByUserId)
+    {
+        if (Status == newStatus) return;
+
+        RequireId(changedByUserId, nameof(changedByUserId));
+        var changedAt = DateTime.UtcNow;
+        statusHistory.Add(new ProductionProgressHistory(Id, Status, newStatus, changedAt, changedByUserId));
+        Status = newStatus;
     }
 
     private void RequireStatus(ProductionStageStatus status)

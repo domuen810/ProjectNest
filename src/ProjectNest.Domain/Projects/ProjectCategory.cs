@@ -1,8 +1,7 @@
 namespace ProjectNest.Domain.Projects;
 
-public enum ProjectType
+public enum ProjectCategory
 {
-    TemporaryCounter,
     PermanentCounter,
     IndependentBeautyRoom
 }

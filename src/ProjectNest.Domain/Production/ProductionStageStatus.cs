@@ -4,5 +4,6 @@ public enum ProductionStageStatus
 {
     NotStarted,
     InProgress,
-    Completed
+    Completed,
+    Blocked
 }

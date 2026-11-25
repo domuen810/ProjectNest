@@ -55,6 +55,7 @@ Store 1 ───── 0..* Project
 
 Project
 ├── 1 ───── 0..* ProjectStatusChange
+├── 1 ───── 0..* ProjectAssignment
 ├── 1 ───── 0..* SurveyWorkOrder
 ├── 1 ───── 0..* DrawingRevision
 └── 1 ───── 0..* ProductionOrder
@@ -63,15 +64,19 @@ SurveyWorkOrder
 └── 1 ───── 0..* SurveyVisit
 
 SurveyVisit
-├── * ───── * User
-└── 1 ───── 0..* StoredFile
+├── 1 ───── 0..* SurveyPersonnel
+└── 1 ───── 0..* SurveyVisitFile
 
 DrawingRevision
-└── 1 ───── 1..* StoredFile
+└── 1 ───── 1..* DrawingRevisionFile
 
 ProductionOrder
 ├── references DrawingRevision
-└── 1 ───── 0..* ProductionStageProgress
+└── 1 ───── 0..* ProductionStageProgress (one per Workshop)
+
+ProductionStageProgress
+├── 1 ───── 0..* ProductionProgressHistory
+└── 1 ───── 0..* ReworkRecord
 ```
 
 ## 2.2 Domain Areas
@@ -84,13 +89,14 @@ Projects
 ├── Project
 ├── ProjectStatusChange
 ├── SavedContact
-├── StoreType
+├── ProjectNature
+├── ProjectCategory
 └── CounterType
 
 Surveys
 ├── SurveyWorkOrder
 ├── SurveyVisit
-├── SurveyVisitPersonnel
+├── SurveyPersonnel
 └── SurveyVisitFile
 
 Drawings
@@ -99,11 +105,14 @@ Drawings
 
 Production
 ├── ProductionOrder
-├── ProductionStage
+├── Workshop
 └── ProductionStageProgress
 
 Identity
-└── User
+├── User
+├── Authentication
+├── JobPosition (predefined; one per User)
+└── SystemRole (predefined; many-to-many with User)
 
 Files
 └── StoredFile
@@ -292,35 +301,61 @@ Project
 ├── Id
 ├── ProjectNumber
 ├── StoreId
-├── ProjectType
+├── ProjectNature
+├── ProjectCategory
 ├── OpeningDate
-├── Area
+├── InitialArea
+├── MeasuredArea
+├── Floor
+├── ShopNumber
 ├── InitialRequirements
 ├── ResponsibleDesignerId
-├── CurrentStatus
-├── PaymentArrangementType
-├── MallPaymentPercentage
+├── Status
 ├── BrandPaymentPercentage
+├── MallPaymentPercentage
+├── BrandNameSnapshot
+├── MallNameSnapshot
+├── BrandContactName?
+├── BrandContactPosition?
+├── BrandContactPhone?
+├── BrandContactEmail?
+├── MallContactName?
+├── MallContactPosition?
+├── MallContactPhone?
+├── MallContactEmail?
+├── CounterType?
+├── HasIntegratedBeautyRoom?
 ├── RequiresTemporaryCounter
 ├── TemporaryCounterNotes
-├── ClientContactSnapshot
-├── MallContactSnapshot
+├── HasExistingCounter
+├── ExistingCounterLocationRelation?
+├── RequiresExistingCounterRemoval (Boolean, defaults to false)
+├── ExistingCounterRemovalReason? (optional)
 ├── CreatedAt
 ├── CreatedById
 ├── UpdatedAt
 └── UpdatedById
 ```
 
-### ProjectType
+`ResponsibleDesignerId` is optional and stores the current Designer. A project may be created before a Designer is assigned. `ProjectAssignment` retains the assignment history.
+
+### ProjectNature
 
 ```text
-NewStore
+New
 Renovation
 ```
 
-Maintenance is part of the wider business lifecycle but is outside the current MVP ProjectType.
+Project nature is independent of project category.
 
-Temporary Counter is a Project requirement, not a ProjectType.
+### ProjectCategory
+
+```text
+PermanentCounter
+IndependentBeautyRoom
+```
+
+A permanent counter requires a `CounterType`. A temporary counter is an optional configuration of a permanent-counter Project, not a separate Project or category. Independent beauty-room Projects are separate Projects and have no direct Project-to-Project relationship.
 
 ---
 
@@ -334,7 +369,7 @@ ProjectStatus
 └── Completed
 ```
 
-`Project.CurrentStatus` records the current operational state.
+`Project.Status` records the current operational state.
 
 Example:
 
@@ -357,10 +392,11 @@ Project status history is retained separately.
 ProjectStatusChange
 ├── Id
 ├── ProjectId
-├── Status
+├── PreviousStatus
+├── NewStatus
 ├── Reason
 ├── ChangedAt
-└── ChangedById
+└── ChangedByUserId
 ```
 
 Relationship:
@@ -381,38 +417,35 @@ Cancelled
 
 Existing Survey, Drawing, Production and File records remain available regardless of Project status.
 
+### ProjectAssignment
+
+Each assignment history record stores the Designer, when the assignment began and ended, and the User who made the assignment. `Project.ResponsibleDesignerId` continues to store the current Designer.
+
+```text
+ProjectAssignment
+├── Id
+├── ProjectId
+├── DesignerUserId
+├── AssignedAt
+├── EndedAt?
+└── AssignedByUserId
+```
+
 ---
 
-## 3.7 Payment Arrangement
+## 3.7 Payment Shares
 
-Payment Arrangement is Project-owned structured data rather than a separate Entity.
-
-```text
-PaymentArrangementType
-├── Mall
-├── Brand
-└── Shared
-```
-
-Fields:
+Brand and Mall payment shares are Project-owned structured data, not contract instalments or free text.
 
 ```text
-PaymentArrangementType
-MallPaymentPercentage
 BrandPaymentPercentage
+MallPaymentPercentage
 ```
 
-Rules:
+The two percentages are each between 0 and 100, and their sum must equal 100.
 
 ```text
-Mall
-→ MallPaymentPercentage = 100
-
-Brand
-→ BrandPaymentPercentage = 100
-
-Shared
-→ MallPaymentPercentage + BrandPaymentPercentage = 100
+BrandPaymentPercentage + MallPaymentPercentage = 100
 ```
 
 ---
@@ -481,10 +514,10 @@ Project Contact Snapshot
 Project fields:
 
 ```text
-ClientContactName
-ClientContactPosition
-ClientContactPhone
-ClientContactEmail
+BrandContactName
+BrandContactPosition
+BrandContactPhone
+BrandContactEmail
 
 MallContactName
 MallContactPosition
@@ -510,7 +543,7 @@ SurveyWorkOrder
 ├── ProjectId
 ├── SurveyType
 ├── Status
-├── PlannedDate
+├── PlannedSurveyDate?
 ├── Notes
 ├── FinalSurveyReportFileId?
 ├── CreatedAt
@@ -522,8 +555,9 @@ SurveyWorkOrder
 ### SurveyType
 
 ```text
-Initial
-Verification
+InitialSurvey
+ReMeasurement
+FollowUpSurvey
 ```
 
 ### SurveyWorkOrderStatus
@@ -532,6 +566,7 @@ Verification
 Planned
 InProgress
 Completed
+Cancelled
 ```
 
 Relationship:
@@ -554,9 +589,10 @@ SurveyWorkOrder 1 ───── 0..* SurveyVisit
 SurveyVisit
 ├── Id
 ├── SurveyWorkOrderId
-├── VisitDate
+├── PlannedDate
+├── ActualVisitDate?
 ├── Status
-├── IncompleteReason?
+├── NoResultReason?
 ├── Findings
 ├── Notes
 ├── VisitReportFileId?
@@ -568,43 +604,32 @@ SurveyVisit
 
 ```text
 Completed
-Incomplete
+Cancelled
+Planned
+InProgress
 ```
 
-Rule:
-
-```text
-Status = Incomplete
-→ IncompleteReason required
-```
-
-Survey personnel may differ between visits.
+Survey personnel may differ between visits. Each `SurveyPersonnel` record belongs to one `SurveyVisit` and stores only a name and phone number; it is not linked to `User`.
 
 ---
 
-## 4.3 SurveyVisitPersonnel
+## 4.3 SurveyPersonnel
 
-A SurveyVisit may involve multiple Users.
-
-A User may participate in multiple SurveyVisits.
+`SurveyPersonnel` records the people who took part in a particular visit. It is a value record owned by `SurveyVisit`, not an account or User assignment.
 
 ```text
-SurveyVisit * ───── * User
+SurveyVisit 1 ───── 0..* SurveyPersonnel
 ```
 
-Join model:
-
 ```text
-SurveyVisitPersonnel
+SurveyPersonnel
+├── Id
 ├── SurveyVisitId
-└── UserId
+├── Name
+└── Phone
 ```
 
-Constraint:
-
-```text
-UNIQUE (SurveyVisitId, UserId)
-```
+`SurveyPersonnel` is a Domain value object containing only `Name` and `Phone`. `Id` and `SurveyVisitId` above are persistence-mapping details only if required by the chosen EF Core mapping; they are not Domain properties.
 
 ---
 
@@ -661,8 +686,11 @@ One SurveyWorkOrder
 Survey personnel
 → may differ between visits
 
-Incomplete SurveyVisit
-→ IncompleteReason required
+SurveyWorkOrder and SurveyVisit statuses
+→ Planned, InProgress, Completed, Cancelled
+
+SurveyVisit without usable measurement results
+→ NoResultReason is required when confirmed without a result
 
 Survey history
 → retained
@@ -894,6 +922,8 @@ No separate Drawing Release workflow
 
 A Project may have multiple factory orders.
 
+`OrderNumber` is required and unique within the Project. It is entered manually in the MVP; automatic numbering is out of scope.
+
 ```text
 Project 1 ───── 0..* ProductionOrder
 ```
@@ -1010,34 +1040,30 @@ Different ProductionOrders may reference different DrawingRevisions.
 
 ---
 
-## 6.5 ProductionStage
+## 6.5 Workshop
 
-Production Stage is Reference Data.
+`Workshop` is the trade/work area used to track progress independently.
 
-Initial values:
+The MVP catalog contains these seven independent operations:
 
 ```text
-Woodwork
-Metalwork
+Carpentry
 Painting
+Glass
+Metal
 Electrical
-Glass / Acrylic
-Hardware Installation
 Pre-assembly
-Packing
+Packing & Shipping
 ```
 
 Model:
 
 ```text
-ProductionStage
+Workshop
 ├── Id
 ├── Name
-├── DisplayOrder
 └── IsActive
 ```
-
-`DisplayOrder` does not enforce strict sequencing.
 
 ---
 
@@ -1047,14 +1073,11 @@ ProductionStage
 ProductionStageProgress
 ├── Id
 ├── ProductionOrderId
-├── ProductionStageId
+├── WorkshopId
 ├── Status
-├── PlannedStartDate
-├── PlannedCompletionDate
-├── ActualStartDate
-├── ActualCompletionDate
-├── ProgressPercentage
 ├── Notes
+├── CreatedAt
+├── CreatedById
 ├── UpdatedAt
 └── UpdatedById
 ```
@@ -1063,6 +1086,8 @@ Relationship:
 
 ```text
 ProductionOrder 1 ───── 0..* ProductionStageProgress
+Workshop 1 ───── 0..* ProductionStageProgress
+UNIQUE (ProductionOrderId, WorkshopId)
 ```
 
 ### ProductionStageStatus
@@ -1074,7 +1099,23 @@ Completed
 Blocked
 ```
 
-Production stages may overlap.
+Workshop progress records may start independently and may be active at the same time.
+
+Every status change is retained in `ProductionProgressHistory`, while `ProductionStageProgress.Status` represents the current status. `ReworkRecord` continues to record rework history independently.
+
+```text
+ProductionProgressHistory
+├── Id
+├── ProductionStageProgressId
+├── PreviousStatus
+├── NewStatus
+├── ChangedAt
+└── ChangedByUserId
+```
+
+`ReworkRecord` remains a separate history record owned by `ProductionStageProgress`; it records rework reason, optional note, recording User and time. A rework record is not a substitute for a status-change history record.
+
+The current Domain model represents progress using `Status`; a separate percentage or planned/actual progress-date model is not specified by the confirmed MVP decisions.
 
 ---
 
@@ -1118,11 +1159,11 @@ ProductionOrder
 OrderNumber
 → unique within Project
 
-Production stages
+Workshop progress
 → may overlap
 
 ProductionStageProgress
-→ one record per Stage per ProductionOrder
+→ at most one record per Workshop per ProductionOrder
 
 InitialDrawingRevision
 → retained
@@ -1148,33 +1189,23 @@ User
 ├── Id
 ├── Name
 ├── Email
-├── Role
+├── JobPositionId
 ├── IsActive
 ├── CreatedAt
 └── UpdatedAt
 ```
 
-External Client and Mall contacts are not Users.
+Every User has exactly one required `JobPosition`, identified by `JobPositionId`. `JobPosition` is a predefined business-position catalog and is managed independently from `SystemRole`. External Client and Mall contacts are not Users.
 
 Inactive Users remain in the system to preserve historical references.
 
 ---
 
-## 7.2 Roles
+## 7.2 SystemRole and JobPosition Catalogs
 
-MVP Roles:
+`SystemRole` is a predefined authorization-role catalog; users cannot create roles. A User may have multiple SystemRoles, and each SystemRole may be assigned to multiple Users. The User/SystemRole association is many-to-many.
 
-```text
-Admin
-TeamManager
-TeamManagerAssistant
-Designer
-EngineeringManager
-EngineeringManagerAssistant
-FactoryManager
-```
-
-The MVP uses one primary Role per User.
+`JobPosition` is a separate predefined business-position catalog. Each User has exactly one JobPosition. JobPosition and SystemRole are managed independently; a JobPosition does not grant authorization.
 
 ---
 
@@ -1215,9 +1246,13 @@ The Domain Model stores the file record and reference; physical file-storage imp
 ## 9.1 Enums
 
 ```text
-ProjectType
-├── NewStore
+ProjectNature
+├── New
 └── Renovation
+
+ProjectCategory
+├── PermanentCounter
+└── IndependentBeautyRoom
 
 ProjectStatus
 ├── Active
@@ -1225,23 +1260,22 @@ ProjectStatus
 ├── Cancelled
 └── Completed
 
-PaymentArrangementType
-├── Mall
-├── Brand
-└── Shared
-
 SurveyType
-├── Initial
-└── Verification
+├── InitialSurvey
+├── ReMeasurement
+└── FollowUpSurvey
 
 SurveyWorkOrderStatus
 ├── Planned
 ├── InProgress
-└── Completed
+├── Completed
+└── Cancelled
 
 SurveyVisitStatus
+├── Planned
+├── InProgress
 ├── Completed
-└── Incomplete
+└── Cancelled
 
 SurveyFileCategory
 ├── SitePhoto
@@ -1267,6 +1301,12 @@ DrawingChangeReason
 ├── ManufacturingIssue
 └── Other
 
+CounterType
+├── FullIsland
+├── HalfIsland
+├── CombinedCounter
+└── WallCounter
+
 ProductionOrderStatus
 ├── Planned
 ├── InProduction
@@ -1279,25 +1319,19 @@ ProductionStageStatus
 ├── Completed
 └── Blocked
 
-Role
-├── Admin
-├── TeamManager
-├── TeamManagerAssistant
-├── Designer
-├── EngineeringManager
-├── EngineeringManagerAssistant
-└── FactoryManager
 ```
+
+`SystemRole` and `JobPosition` are predefined reference catalogs, not Domain enums. Their exact catalog entries are not specified here. Every User has one required JobPosition and may have multiple SystemRoles.
 
 ## 9.2 Reference Data
 
 ```text
-StoreType
-CounterType
-ProductionStage
+Workshop
 ```
 
-These are stored as managed data rather than fixed application enums.
+`Workshop` is reference data for the seven MVP trades. `CounterType` is a fixed Domain enum and applies only to `PermanentCounter` Projects.
+
+Workshop names are restricted to the seven values above and cannot be renamed. The records will be initialized by database seed data in the persistence phase.
 
 ---
 
@@ -1324,37 +1358,18 @@ CreatedAt           required
 UpdatedAt           required
 ```
 
-## StoreTypes
-
-```text
-Id                  PK
-BrandId             FK → Brands, optional
-Name                required
-IsActive            required
-```
-
-## CounterTypes
-
-```text
-Id                  PK
-Name                required
-ParentCounterTypeId FK → CounterTypes, optional
-IsActive            required
-```
-
 ## Stores
 
 ```text
 Id                  PK
 BrandId             FK → Brands
 MallId              FK → Malls
-StoreLocation       optional
-StoreTypeId         FK → StoreTypes
-CounterTypeId       FK → CounterTypes
-IsActive            required
+Status              required (PreOpening, Open, Closed)
 CreatedAt           required
 UpdatedAt           required
 ```
+
+`Store` remains a separate Brand-in-Mall location entity; counter classification belongs to Project. Its lifecycle is `PreOpening`, `Open`, or `Closed`, and a Store may have multiple Projects over time.
 
 ## Projects
 
@@ -1362,29 +1377,36 @@ UpdatedAt           required
 Id                          PK
 ProjectNumber               required
 StoreId                     FK → Stores
-ProjectType                 required
+ProjectNature               required
+ProjectCategory             required
 OpeningDate                 required
-Area                        optional
+InitialArea                 optional
+MeasuredArea                optional
+Floor                       optional
+ShopNumber                  optional
 InitialRequirements         optional
-ResponsibleDesignerId       FK → Users
-CurrentStatus               required
-
-PaymentArrangementType      required
-MallPaymentPercentage       optional
-BrandPaymentPercentage      optional
-
-RequiresTemporaryCounter    required
-TemporaryCounterNotes       optional
-
-ClientContactName           optional
-ClientContactPosition       optional
-ClientContactPhone          optional
-ClientContactEmail          optional
-
+ResponsibleDesignerId       FK → Users, optional
+Status                      required
+BrandPaymentPercentage     required
+MallPaymentPercentage      required
+BrandNameSnapshot           required
+MallNameSnapshot            required
+BrandContactName            optional
+BrandContactPosition        optional
+BrandContactPhone           optional
+BrandContactEmail           optional
 MallContactName             optional
 MallContactPosition         optional
 MallContactPhone            optional
 MallContactEmail            optional
+CounterType                 required for PermanentCounter; otherwise absent
+HasIntegratedBeautyRoom     optional
+RequiresTemporaryCounter    required
+TemporaryCounterNotes       optional
+HasExistingCounter          required
+ExistingCounterLocationRelation conditional
+RequiresExistingCounterRemoval required Boolean (defaults to false)
+ExistingCounterRemovalReason optional
 
 CreatedAt                   required
 CreatedById                 FK → Users
@@ -1392,16 +1414,41 @@ UpdatedAt                   required
 UpdatedById                 FK → Users
 ```
 
+`ResponsibleDesignerId` is optional and stores the current Designer. Assignment changes are retained in `ProjectAssignments`.
+
+`RequiresExistingCounterRemoval` is a Project-level Boolean option for Engineering work planning. It is false by default, and no reason is required when demolition is not selected.
+
+## ProjectAssignments
+
+```text
+Id                  PK
+ProjectId           FK → Projects
+DesignerUserId      FK → Users
+AssignedAt          required
+EndedAt             optional
+AssignedByUserId    FK → Users
+```
+
 ## ProjectStatusChanges
 
 ```text
 Id                  PK
 ProjectId           FK → Projects
-Status              required
-Reason              conditional
+PreviousStatus      required
+NewStatus           required
+Reason              required for Paused or Cancelled transitions
 ChangedAt           required
-ChangedById         FK → Users
+ChangedByUserId     FK → Users
 ```
+
+## OpeningDateChanges and MeasuredAreaChanges
+
+```text
+OpeningDateChange: ProjectId, PreviousOpeningDate, NewOpeningDate, ChangedByUserId, ChangedAt
+MeasuredAreaChange: ProjectId, PreviousArea, NewArea, ChangedByUserId, ChangedAt, Reason
+```
+
+Measured-area changes require a non-empty reason.
 
 ## SavedContacts
 
@@ -1423,9 +1470,9 @@ UpdatedAt           required
 ```text
 Id                          PK
 ProjectId                   FK → Projects
-SurveyType                  required
-Status                      required
-PlannedDate                 optional
+SurveyType                  required (InitialSurvey, ReMeasurement, FollowUpSurvey)
+Status                      required (Planned, InProgress, Completed, Cancelled)
+PlannedSurveyDate           optional
 Notes                       optional
 FinalSurveyReportFileId     FK → StoredFiles, optional
 CreatedAt                   required
@@ -1439,9 +1486,10 @@ UpdatedById                 FK → Users
 ```text
 Id                  PK
 SurveyWorkOrderId   FK → SurveyWorkOrders
-VisitDate           required
-Status              required
-IncompleteReason    conditional
+PlannedDate         required
+ActualVisitDate     optional
+Status              required (Planned, InProgress, Completed, Cancelled)
+NoResultReason      optional
 Findings            optional
 Notes               optional
 VisitReportFileId   FK → StoredFiles, optional
@@ -1449,11 +1497,13 @@ CreatedAt           required
 UpdatedAt           required
 ```
 
-## SurveyVisitPersonnel
+## SurveyPersonnel
 
 ```text
-SurveyVisitId       PK/FK → SurveyVisits
-UserId              PK/FK → Users
+Id                  PK
+SurveyVisitId       FK → SurveyVisits
+Name                required
+Phone               required
 ```
 
 ## SurveyVisitFiles
@@ -1470,7 +1520,7 @@ Category            required
 ```text
 Id                          PK
 ProjectId                   FK → Projects
-Stage                       required
+DrawingStage                required
 RevisionNumber              required
 IsCurrent                   required
 ChangeScope                 required
@@ -1512,12 +1562,11 @@ UpdatedAt                   required
 UpdatedById                 FK → Users
 ```
 
-## ProductionStages
+## Workshops
 
 ```text
 Id                  PK
 Name                required
-DisplayOrder        required
 IsActive            required
 ```
 
@@ -1526,17 +1575,40 @@ IsActive            required
 ```text
 Id                      PK
 ProductionOrderId       FK → ProductionOrders
-ProductionStageId       FK → ProductionStages
+WorkshopId              FK → Workshops
 Status                  required
-ProgressPercentage      required
-PlannedStartDate        optional
-PlannedCompletionDate   optional
-ActualStartDate         optional
-ActualCompletionDate    optional
 Notes                   optional
+CreatedAt               required
+CreatedById              FK → Users
 UpdatedAt               required
 UpdatedById             FK → Users
 ```
+
+## ProductionProgressHistory
+
+```text
+Id                          PK
+ProductionStageProgressId   FK → ProductionStageProgress
+PreviousStatus              required
+NewStatus                  required
+ChangedAt                   required
+ChangedByUserId             FK → Users
+```
+
+`ProductionStageProgress.Status` remains the current status; each status-change record is retained separately.
+
+## ReworkRecords
+
+```text
+Id                          PK
+ProductionStageProgressId   FK → ProductionStageProgress
+ReasonType                  required
+Note                        optional
+RecordedByUserId            FK → Users
+RecordedAt                  required
+```
+
+`ReworkRecord` remains separate from `ProductionProgressHistory` and records rework-specific history.
 
 ## Users
 
@@ -1544,11 +1616,38 @@ UpdatedById             FK → Users
 Id                  PK
 Name                required
 Email               required
-Role                required
+JobPositionId       FK → JobPositions, required
 IsActive            required
 CreatedAt           required
 UpdatedAt           required
 ```
+
+## JobPositions
+
+```text
+Id                  PK
+Name                required
+```
+
+The JobPosition catalog is predefined and managed independently from SystemRole.
+
+## SystemRoles
+
+```text
+Id                  PK
+Name                required
+```
+
+The SystemRole catalog is predefined; users cannot create roles.
+
+## UserSystemRoles
+
+```text
+UserId              PK, FK → Users
+SystemRoleId        PK, FK → SystemRoles
+```
+
+The pair `(UserId, SystemRoleId)` is unique, implementing the confirmed many-to-many association.
 
 ## StoredFiles
 
@@ -1584,9 +1683,6 @@ UNIQUE(ProjectNumber)
 Users
 UNIQUE(Email)
 
-SurveyVisitPersonnel
-UNIQUE(SurveyVisitId, UserId)
-
 DrawingRevisions
 UNIQUE(ProjectId, Stage, RevisionNumber)
 
@@ -1594,7 +1690,7 @@ ProductionOrders
 UNIQUE(ProjectId, OrderNumber)
 
 ProductionStageProgress
-UNIQUE(ProductionOrderId, ProductionStageId)
+UNIQUE(ProductionOrderId, WorkshopId)
 
 StoredFiles
 UNIQUE(StorageKey)
@@ -1637,10 +1733,11 @@ Cancelled Project
 
 ## 11.5 Survey Rules
 
-```text
-SurveyVisit.Status = Incomplete
-→ IncompleteReason required
-```
+Both SurveyWorkOrder and SurveyVisit use `Planned`, `InProgress`, `Completed`, and `Cancelled`.
+
+`ConfirmWithoutResult` requires a non-empty reason, retained as `NoResultReason`; this does not introduce an `Incomplete` status.
+
+A cancelled SurveyVisit cannot subsequently be confirmed.
 
 ---
 
@@ -1651,7 +1748,7 @@ DrawingChangeScope = Partial
 → AffectedPagesOrAreas required
 
 DrawingRevision
-→ must contain at least one DrawingRevisionFile
+→ at least one DrawingRevisionFile is required
 ```
 
 ---
@@ -1678,14 +1775,7 @@ Stage = ProductionOrder
 ## 11.8 Payment Rules
 
 ```text
-PaymentArrangementType = Mall
-→ MallPaymentPercentage = 100
-
-PaymentArrangementType = Brand
-→ BrandPaymentPercentage = 100
-
-PaymentArrangementType = Shared
-→ MallPaymentPercentage + BrandPaymentPercentage = 100
+BrandPaymentPercentage + MallPaymentPercentage = 100
 
 Each percentage
 → between 0 and 100
@@ -1738,9 +1828,8 @@ Reference or reusable records may be deactivated rather than removed from histor
 Brand
 Mall
 Store
-StoreType
 CounterType
-ProductionStage
+Workshop
 User
 SavedContact
 ```
@@ -1762,11 +1851,23 @@ One Store may have multiple Projects over time.
 
 PROJECT
 
-ProjectType = NewStore / Renovation.
+ProjectNature = New / Renovation.
+
+ProjectCategory = PermanentCounter / IndependentBeautyRoom.
+
+PermanentCounter Projects require one CounterType: FullIsland, HalfIsland, CombinedCounter or WallCounter.
+
+Project payment shares are structured Brand/Mall percentages totaling 100%; they are not instalments.
 
 Project may be Active, Paused, Cancelled or Completed.
 
+ResponsibleDesignerId is optional; assignment changes are retained.
+
 Paused / Cancelled requires a reason.
+
+Status changes record previous status, new status, time and changing User.
+
+Once a responsible Designer is assigned, assignment cannot be cancelled; changes end the old ProjectAssignment and add a new one.
 
 Cancelled Projects remain in the system.
 
@@ -1775,7 +1876,7 @@ SURVEY
 
 One SurveyWorkOrder may require multiple SurveyVisits.
 
-Survey personnel may differ between visits.
+Survey personnel may differ between visits; each visit records its own name/phone SurveyPersonnel, not Users.
 
 Each visit retains its own source files and report.
 
@@ -1799,6 +1900,25 @@ Partial revisions identify affected pages / areas.
 
 PRODUCTION
 
+Each ProductionOrder has a required OrderNumber, unique within its Project; MVP numbering is manual.
+
+Each ProductionOrder has at most one ProductionStageProgress per Workshop.
+
+Workshop progress may begin independently and overlap.
+
+The fixed MVP Workshop catalog contains Carpentry, Painting, Glass, Metal, Electrical, Pre-assembly, and Packing & Shipping; arbitrary entries cannot be created or renamed.
+
+ProductionOrder status is Planned, InProduction, Completed, or Cancelled; ProductionStageProgress also supports Blocked.
+
+
+HISTORY AND AUDIT
+
+Retain Project status changes, responsible Designer assignment changes, DrawingRevision updates and ProductionStageProgress changes.
+
+Do not record ordinary page views or button clicks as operational history.
+
+Existing generic audit fields, such as `CreatedByUserId` and `UpdatedByUserId`, are retained on Domain entities where they already exist; they are not required on every Domain entity. Audit metadata population and handling will be centralized in the Application/Infrastructure layers in a later implementation stage. This does not remove existing Domain audit fields. Actor IDs in explicit business-history records remain separate and unchanged.
+
 One Project may have multiple ProductionOrders.
 
 Each ProductionOrder has an explicit Scope.
@@ -1809,7 +1929,7 @@ Each order also identifies its current drawing basis.
 
 Different orders may reference different DrawingRevisions.
 
-Production stages may overlap.
+Workshop progress may start independently and overlap.
 
 Drawing-change history belongs to the Drawing domain.
 
@@ -1840,24 +1960,27 @@ The following ERD represents the logical data model for the ProjectNest MVP.
 erDiagram
 
     BRAND ||--o{ STORE : has
-    BRAND ||--o{ STORE_TYPE : defines
     BRAND ||--o{ SAVED_CONTACT : has
 
     MALL ||--o{ STORE : contains
     MALL ||--o{ SAVED_CONTACT : has
 
-    STORE_TYPE ||--o{ STORE : classifies
-    COUNTER_TYPE ||--o{ STORE : classifies
-    COUNTER_TYPE o|--o{ COUNTER_TYPE : parent_of
-
     STORE ||--o{ PROJECT : has
 
-    USER ||--o{ PROJECT : responsible_designer
+    USER o|--o{ PROJECT : responsible_designer
     USER ||--o{ PROJECT : created_by
     USER ||--o{ PROJECT : updated_by
 
     PROJECT ||--o{ PROJECT_STATUS_CHANGE : has
     USER ||--o{ PROJECT_STATUS_CHANGE : changed_by
+    PROJECT ||--o{ PROJECT_ASSIGNMENT : assignment_history
+    USER ||--o{ PROJECT_ASSIGNMENT : assigned_designer
+    USER ||--o{ PROJECT_ASSIGNMENT : assigned_by
+
+    JOB_POSITION ||--o{ USER : assigned_position
+    USER ||--o{ USER_SYSTEM_ROLE : has_role
+    SYSTEM_ROLE ||--o{ USER_SYSTEM_ROLE : assigned_to
+
 
     PROJECT ||--o{ SURVEY_WORK_ORDER : has
     USER ||--o{ SURVEY_WORK_ORDER : created_by
@@ -1865,8 +1988,7 @@ erDiagram
     SURVEY_WORK_ORDER ||--o{ SURVEY_VISIT : contains
     STORED_FILE o|--o| SURVEY_WORK_ORDER : final_report
 
-    SURVEY_VISIT ||--o{ SURVEY_VISIT_PERSONNEL : has
-    USER ||--o{ SURVEY_VISIT_PERSONNEL : participates
+    SURVEY_VISIT ||--o{ SURVEY_PERSONNEL : has
 
     SURVEY_VISIT ||--o{ SURVEY_VISIT_FILE : has
     STORED_FILE ||--o{ SURVEY_VISIT_FILE : referenced_by
@@ -1887,9 +2009,13 @@ erDiagram
     USER ||--o{ PRODUCTION_ORDER : updated_by
 
     PRODUCTION_ORDER ||--o{ PRODUCTION_STAGE_PROGRESS : has
-    PRODUCTION_STAGE ||--o{ PRODUCTION_STAGE_PROGRESS : defines
+    WORKSHOP ||--o{ PRODUCTION_STAGE_PROGRESS : defines
 
     USER ||--o{ PRODUCTION_STAGE_PROGRESS : updated_by
+    PRODUCTION_STAGE_PROGRESS ||--o{ PRODUCTION_PROGRESS_HISTORY : status_history
+    USER ||--o{ PRODUCTION_PROGRESS_HISTORY : changed_by
+    PRODUCTION_STAGE_PROGRESS ||--o{ REWORK_RECORD : rework_history
+    USER ||--o{ REWORK_RECORD : recorded_by
 
     USER ||--o{ STORED_FILE : uploaded_by
 
@@ -1899,7 +2025,9 @@ erDiagram
         string Name
         bool IsActive
         datetime CreatedAt
+        uuid CreatedById FK
         datetime UpdatedAt
+        uuid UpdatedById FK
     }
 
     MALL {
@@ -1911,28 +2039,11 @@ erDiagram
         datetime UpdatedAt
     }
 
-    STORE_TYPE {
-        uuid Id PK
-        uuid BrandId FK
-        string Name
-        bool IsActive
-    }
-
-    COUNTER_TYPE {
-        uuid Id PK
-        string Name
-        uuid ParentCounterTypeId FK
-        bool IsActive
-    }
-
     STORE {
         uuid Id PK
         uuid BrandId FK
         uuid MallId FK
-        string StoreLocation
-        uuid StoreTypeId FK
-        uuid CounterTypeId FK
-        bool IsActive
+        string Status
         datetime CreatedAt
         datetime UpdatedAt
     }
@@ -1941,29 +2052,37 @@ erDiagram
         uuid Id PK
         string ProjectNumber
         uuid StoreId FK
-        string ProjectType
+        string ProjectNature
+        string ProjectCategory
         date OpeningDate
-        decimal Area
+        decimal InitialArea
+        decimal MeasuredArea
+        string Floor
+        string ShopNumber
         string InitialRequirements
-        uuid ResponsibleDesignerId FK
-        string CurrentStatus
+        uuid ResponsibleDesignerId FK, optional
+        string Status
 
-        string PaymentArrangementType
         decimal MallPaymentPercentage
         decimal BrandPaymentPercentage
 
-        bool RequiresTemporaryCounter
-        string TemporaryCounterNotes
-
-        string ClientContactName
-        string ClientContactPosition
-        string ClientContactPhone
-        string ClientContactEmail
-
+        string BrandContactName
+        string BrandContactPosition
+        string BrandContactPhone
+        string BrandContactEmail
         string MallContactName
         string MallContactPosition
         string MallContactPhone
         string MallContactEmail
+
+        bool RequiresTemporaryCounter
+        string TemporaryCounterNotes
+        string CounterType
+        bool HasIntegratedBeautyRoom
+        bool HasExistingCounter
+        string ExistingCounterLocationRelation
+        bool RequiresExistingCounterRemoval
+        string ExistingCounterRemovalReason
 
         datetime CreatedAt
         uuid CreatedById FK
@@ -1974,10 +2093,20 @@ erDiagram
     PROJECT_STATUS_CHANGE {
         uuid Id PK
         uuid ProjectId FK
-        string Status
+        string PreviousStatus
+        string NewStatus
         string Reason
         datetime ChangedAt
-        uuid ChangedById FK
+        uuid ChangedByUserId FK
+    }
+
+    PROJECT_ASSIGNMENT {
+        uuid Id PK
+        uuid ProjectId FK
+        uuid DesignerUserId FK
+        datetime AssignedAt
+        datetime EndedAt
+        uuid AssignedByUserId FK
     }
 
     SAVED_CONTACT {
@@ -1998,7 +2127,7 @@ erDiagram
         uuid ProjectId FK
         string SurveyType
         string Status
-        date PlannedDate
+        date PlannedSurveyDate
         string Notes
         uuid FinalSurveyReportFileId FK
         datetime CreatedAt
@@ -2010,9 +2139,10 @@ erDiagram
     SURVEY_VISIT {
         uuid Id PK
         uuid SurveyWorkOrderId FK
-        date VisitDate
+        date PlannedDate
+        date ActualVisitDate
         string Status
-        string IncompleteReason
+        string NoResultReason
         string Findings
         string Notes
         uuid VisitReportFileId FK
@@ -2020,9 +2150,11 @@ erDiagram
         datetime UpdatedAt
     }
 
-    SURVEY_VISIT_PERSONNEL {
-        uuid SurveyVisitId PK,FK
-        uuid UserId PK,FK
+    SURVEY_PERSONNEL {
+        uuid Id PK
+        uuid SurveyVisitId FK
+        string Name
+        string Phone
     }
 
     SURVEY_VISIT_FILE {
@@ -2035,7 +2167,7 @@ erDiagram
     DRAWING_REVISION {
         uuid Id PK
         uuid ProjectId FK
-        string Stage
+        string DrawingStage
         int RevisionNumber
         bool IsCurrent
         string ChangeScope
@@ -2073,33 +2205,62 @@ erDiagram
         uuid UpdatedById FK
     }
 
-    PRODUCTION_STAGE {
+    WORKSHOP {
         uuid Id PK
         string Name
-        int DisplayOrder
         bool IsActive
     }
 
     PRODUCTION_STAGE_PROGRESS {
         uuid Id PK
         uuid ProductionOrderId FK
-        uuid ProductionStageId FK
+        uuid WorkshopId FK
         string Status
-        decimal ProgressPercentage
-        date PlannedStartDate
-        date PlannedCompletionDate
-        date ActualStartDate
-        date ActualCompletionDate
         string Notes
+        datetime CreatedAt
+        uuid CreatedById FK
         datetime UpdatedAt
         uuid UpdatedById FK
+    }
+
+    PRODUCTION_PROGRESS_HISTORY {
+        uuid Id PK
+        uuid ProductionStageProgressId FK
+        string PreviousStatus
+        string NewStatus
+        datetime ChangedAt
+        uuid ChangedByUserId FK
+    }
+
+    REWORK_RECORD {
+        uuid Id PK
+        uuid ProductionStageProgressId FK
+        string ReasonType
+        string Note
+        uuid RecordedByUserId FK
+        datetime RecordedAt
+    }
+
+    JOB_POSITION {
+        uuid Id PK
+        string Name
+    }
+
+    SYSTEM_ROLE {
+        uuid Id PK
+        string Name
+    }
+
+    USER_SYSTEM_ROLE {
+        uuid UserId PK, FK
+        uuid SystemRoleId PK, FK
     }
 
     USER {
         uuid Id PK
         string Name
         string Email
-        string Role
+        uuid JobPositionId FK
         bool IsActive
         datetime CreatedAt
         datetime UpdatedAt
@@ -2128,12 +2289,19 @@ Store 1 ───── 0..* Project
 
 Project 1 ───── 0..* ProjectStatusChange
 
+Project 1 ───── 0..* ProjectAssignment
+User 1 ───── 0..* ProjectAssignment (DesignerUserId)
+User 1 ───── 0..* ProjectAssignment (AssignedByUserId)
+
+JobPosition 1 ───── 0..* User
+User 1 ───── 0..* UserSystemRole
+SystemRole 1 ───── 0..* UserSystemRole
+
 Project 1 ───── 0..* SurveyWorkOrder
 
 SurveyWorkOrder 1 ───── 0..* SurveyVisit
 
-SurveyVisit * ───── * User
-via SurveyVisitPersonnel
+SurveyVisit 1 ───── 0..* SurveyPersonnel
 
 Project 1 ───── 0..* DrawingRevision
 
@@ -2143,7 +2311,10 @@ Project 1 ───── 0..* ProductionOrder
 
 ProductionOrder 1 ───── 0..* ProductionStageProgress
 
-ProductionStage 1 ───── 0..* ProductionStageProgress
+Workshop 1 ───── 0..* ProductionStageProgress
+
+ProductionStageProgress 1 ───── 0..* ProductionProgressHistory
+ProductionStageProgress 1 ───── 0..* ReworkRecord
 
 User 1 ───── 0..* StoredFile
 ```
@@ -2152,11 +2323,14 @@ User 1 ───── 0..* StoredFile
 
 * `Mall.Id`, `Brand.Id`, `Store.Id` and other entity IDs are the relational identifiers; display names are not used as foreign keys.
 * `SavedContact` belongs to either a Brand or a Mall, but not both.
-* `SurveyVisitPersonnel` resolves the many-to-many relationship between SurveyVisit and User.
+* `SurveyPersonnel` belongs to a SurveyVisit and stores name and phone only; it has no User relationship.
 * `SurveyVisitFile` stores the category of each survey source file.
-* `DrawingRevisionFile` allows one DrawingRevision to contain multiple physical files.
+* Every `DrawingRevision` must have at least one associated `DrawingRevisionFile`; a revision may have multiple files, such as PDF and CAD files. The minimum-child requirement needs application-level enforcement; a foreign key alone cannot ensure it.
 * `DrawingRevision.IsCurrent` identifies the current revision within each Project and DrawingStage.
 * `ProductionOrder.InitialDrawingRevisionId` preserves the drawing originally issued to Factory.
 * `ProductionOrder.CurrentDrawingRevisionId` identifies the drawing Factory should currently use.
 * Different ProductionOrders within one Project may reference different ProductionOrder-stage DrawingRevisions.
-* ProductionStageProgress links each ProductionOrder to independently tracked ProductionStages.
+* ProductionStageProgress links each ProductionOrder to a Workshop; `(ProductionOrderId, WorkshopId)` is unique so each Workshop has at most one progress record per order.
+* `ProjectAssignment` records ProjectId, DesignerUserId, AssignedAt, EndedAt, and AssignedByUserId; `Project.ResponsibleDesignerId` remains the current-assignee reference.
+* `ProductionProgressHistory` records ProductionStageProgressId, PreviousStatus, NewStatus, ChangedAt, and ChangedByUserId. `ProductionStageProgress.Status` remains current, and `ReworkRecord` remains independent.
+* `JobPosition` is a predefined catalog with exactly one required JobPosition per User. `SystemRole` is a separate predefined catalog with a many-to-many User association; users cannot create roles.

@@ -1,45 +1,69 @@
+using ProjectNest.Domain.Files;
+
 namespace ProjectNest.Domain.Surveys;
 
 public class SurveyVisit
 {
     private readonly List<SurveyPersonnel> personnel = new();
+    private readonly List<SurveyVisitFile> files = new();
 
     public Guid Id { get; private set; }
     public Guid SurveyWorkOrderId { get; private set; }
-    public SurveyVisitType SurveyVisitType { get; private set; }
     public DateOnly PlannedDate { get; private set; }
     public DateOnly? ActualVisitDate { get; private set; }
+    public SurveyVisitStatus Status { get; private set; }
     public IReadOnlyList<SurveyPersonnel> Personnel => personnel.AsReadOnly();
+    public IReadOnlyList<SurveyVisitFile> Files => files.AsReadOnly();
+    public Guid? VisitReportFileId { get; private set; }
+    public string? Findings { get; private set; }
+    public string? Notes { get; private set; }
     public string? NoResultReason { get; private set; }
     public Guid? ConfirmedByDesignerUserId { get; private set; }
     public DateTime? ConfirmedAt { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
-    public SurveyVisit(Guid surveyWorkOrderId, SurveyVisitType surveyVisitType, DateOnly plannedDate)
+    private SurveyVisit()
+    {
+    }
+
+    public SurveyVisit(Guid surveyWorkOrderId, DateOnly plannedDate)
     {
         if (surveyWorkOrderId == Guid.Empty)
         {
             throw new ArgumentException("Survey work order is required.", nameof(surveyWorkOrderId));
         }
 
-        if (!Enum.IsDefined(surveyVisitType))
-        {
-            throw new ArgumentException("A valid survey visit type is required.", nameof(surveyVisitType));
-        }
-
         RequireDate(plannedDate, nameof(plannedDate));
         Id = Guid.NewGuid();
         SurveyWorkOrderId = surveyWorkOrderId;
-        SurveyVisitType = surveyVisitType;
         PlannedDate = plannedDate;
+        Status = SurveyVisitStatus.Planned;
         CreatedAt = DateTime.UtcNow;
         UpdatedAt = CreatedAt;
+    }
+
+    public void Start()
+    {
+        RequirePlanned();
+        Status = SurveyVisitStatus.InProgress;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void Cancel()
+    {
+        if (Status is SurveyVisitStatus.Completed or SurveyVisitStatus.Cancelled)
+        {
+            throw new InvalidOperationException("A completed or cancelled survey visit cannot be cancelled.");
+        }
+        Status = SurveyVisitStatus.Cancelled;
+        UpdatedAt = DateTime.UtcNow;
     }
 
     public void ChangePlannedDate(DateOnly plannedDate)
     {
         RequireUnconfirmed();
+        RequirePlanned();
         RequireDate(plannedDate, nameof(plannedDate));
         PlannedDate = plannedDate;
         UpdatedAt = DateTime.UtcNow;
@@ -68,6 +92,32 @@ public class SurveyVisit
         UpdatedAt = DateTime.UtcNow;
     }
 
+    public void AddFile(StoredFile file, SurveyFileCategory category)
+    {
+        ArgumentNullException.ThrowIfNull(file);
+        if (!Enum.IsDefined(category))
+        {
+            throw new ArgumentException("Invalid survey file category.", nameof(category));
+        }
+        files.Add(new SurveyVisitFile(Id, file, category));
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void AttachVisitReport(StoredFile file)
+    {
+        ArgumentNullException.ThrowIfNull(file);
+        VisitReportFileId = file.Id;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void UpdateFindingsAndNotes(string? findings, string? notes)
+    {
+        RequireUnconfirmed();
+        Findings = OptionalText(findings);
+        Notes = OptionalText(notes);
+        UpdatedAt = DateTime.UtcNow;
+    }
+
     public void ConfirmWithMeasurementResult(Guid designerUserId)
     {
         RequireUnconfirmed();
@@ -76,7 +126,6 @@ public class SurveyVisit
             throw new InvalidOperationException("Record the actual visit date before confirming measurement results.");
         }
 
-        // Result-file association and upload verification belong to the future StoredFile workflow.
         Confirm(designerUserId);
     }
 
@@ -94,6 +143,11 @@ public class SurveyVisit
 
     private void Confirm(Guid designerUserId)
     {
+        if (Status == SurveyVisitStatus.Cancelled)
+        {
+            throw new InvalidOperationException("A cancelled survey visit cannot be confirmed.");
+        }
+
         if (designerUserId == Guid.Empty)
         {
             throw new ArgumentException("Confirming designer is required.", nameof(designerUserId));
@@ -101,6 +155,7 @@ public class SurveyVisit
 
         ConfirmedByDesignerUserId = designerUserId;
         ConfirmedAt = DateTime.UtcNow;
+        Status = SurveyVisitStatus.Completed;
         UpdatedAt = ConfirmedAt.Value;
     }
 
@@ -112,6 +167,14 @@ public class SurveyVisit
         }
     }
 
+    private void RequirePlanned()
+    {
+        if (Status != SurveyVisitStatus.Planned)
+        {
+            throw new InvalidOperationException("Only a planned survey visit can be changed or started.");
+        }
+    }
+
     private static void RequireDate(DateOnly value, string parameterName)
     {
         if (value == default)
@@ -119,4 +182,6 @@ public class SurveyVisit
             throw new ArgumentException("A date is required.", parameterName);
         }
     }
+
+    private static string? OptionalText(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
