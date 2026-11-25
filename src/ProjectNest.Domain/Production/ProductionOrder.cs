@@ -4,7 +4,8 @@ public class ProductionOrder
 {
     public Guid Id { get; private set; }
     public Guid ProjectId { get; private set; }
-    public string Scope { get; private set; }
+    public string OrderNumber { get; private set; } = string.Empty;
+    public string Scope { get; private set; } = string.Empty;
     public Guid InitialDrawingRevisionId { get; private set; }
     public Guid CurrentDrawingRevisionId { get; private set; }
     public ProductionOrderStatus Status { get; private set; }
@@ -13,23 +14,25 @@ public class ProductionOrder
     public Guid UpdatedByUserId { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
-    public ProductionOrder(Guid projectId, string scope, Guid initialDrawingRevisionId, Guid createdByUserId)
+    private ProductionOrder()
+    {
+    }
+
+    public ProductionOrder(Guid projectId, string orderNumber, string scope,
+        Guid initialDrawingRevisionId, Guid createdByUserId)
     {
         RequireId(projectId, nameof(projectId));
         RequireId(initialDrawingRevisionId, nameof(initialDrawingRevisionId));
         RequireId(createdByUserId, nameof(createdByUserId));
-        if (string.IsNullOrWhiteSpace(scope))
-        {
-            throw new ArgumentException("Production scope is required.", nameof(scope));
-        }
 
+        OrderNumber = RequiredText(orderNumber, nameof(orderNumber));
+        Scope = RequiredText(scope, nameof(scope));
+        // Application validates that the revision belongs to this project and is a production drawing.
         Id = Guid.NewGuid();
         ProjectId = projectId;
-        Scope = scope.Trim();
-        // Application validates that the revision belongs to this project and is a production drawing.
         InitialDrawingRevisionId = initialDrawingRevisionId;
         CurrentDrawingRevisionId = initialDrawingRevisionId;
-        Status = ProductionOrderStatus.Active;
+        Status = ProductionOrderStatus.Planned;
         CreatedByUserId = createdByUserId;
         CreatedAt = DateTime.UtcNow;
         UpdatedByUserId = createdByUserId;
@@ -45,24 +48,16 @@ public class ProductionOrder
         CurrentDrawingRevisionId = drawingRevisionId;
     }
 
-    public void Pause(Guid updatedByUserId)
+    public void Start(Guid updatedByUserId)
     {
-        RequireStatus(ProductionOrderStatus.Active);
+        RequireStatus(ProductionOrderStatus.Planned);
         Touch(updatedByUserId);
-        Status = ProductionOrderStatus.Paused;
-    }
-
-    public void Resume(Guid updatedByUserId)
-    {
-        RequireStatus(ProductionOrderStatus.Paused);
-        Touch(updatedByUserId);
-        // Resuming preserves the same order identity and history.
-        Status = ProductionOrderStatus.Active;
+        Status = ProductionOrderStatus.InProduction;
     }
 
     public void Complete(Guid updatedByUserId)
     {
-        RequireStatus(ProductionOrderStatus.Active);
+        RequireStatus(ProductionOrderStatus.InProduction);
         Touch(updatedByUserId);
         Status = ProductionOrderStatus.Completed;
     }
@@ -76,9 +71,9 @@ public class ProductionOrder
 
     private void RequireOpen()
     {
-        if (Status != ProductionOrderStatus.Active && Status != ProductionOrderStatus.Paused)
+        if (Status is not (ProductionOrderStatus.Planned or ProductionOrderStatus.InProduction))
         {
-            throw new InvalidOperationException("Only active or paused production orders can be changed.");
+            throw new InvalidOperationException("Only planned or in-production orders can be changed.");
         }
     }
 
@@ -95,6 +90,12 @@ public class ProductionOrder
         RequireId(updatedByUserId, nameof(updatedByUserId));
         UpdatedByUserId = updatedByUserId;
         UpdatedAt = DateTime.UtcNow;
+    }
+
+    private static string RequiredText(string? value, string parameterName)
+    {
+        if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException("A non-empty value is required.", parameterName);
+        return value.Trim();
     }
 
     private static void RequireId(Guid value, string parameterName)

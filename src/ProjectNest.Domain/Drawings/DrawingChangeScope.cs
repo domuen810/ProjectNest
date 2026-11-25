@@ -1,7 +1,7 @@
 namespace ProjectNest.Domain.Drawings;
 
-public enum DrawingUpdateType
+public enum DrawingChangeScope
 {
-    Full,
+    FullSet,
     Partial
 }

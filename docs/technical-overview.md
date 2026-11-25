@@ -46,8 +46,8 @@ A new project is issued by the **client** to the **Team Manager** via email, pro
 location, area, opening date, client contact, initial
 requirements and any available mall drawings.
 
-The **Team Manager Assistant** creates the project in ProjectNest and
-assigns the responsible Designer.
+The **Team Manager Assistant** creates the project in ProjectNest. A
+responsible Designer may be assigned at creation or later.
 Before design begins, the physical site is surveyed through a
 cross-department workflow:
 
@@ -92,11 +92,12 @@ Detailed / Production Drawings
 ```
 
 Existing business practice generally uses **one CAD file together with
-one PDF drawing set**. Each Drawing Set can have multiple revisions, and
-previous revisions are retained for traceability.
+one PDF drawing package**. In ProjectNest, a DrawingSet is not a separate
+entity: DrawingRevisions are managed under a Project (and drawing stage),
+with the associated files retained for traceability.
 
 ``` text
-Production Drawing Set
+Project — Production DrawingRevisions
 │
 ├── R01
 ├── R02
@@ -142,7 +143,7 @@ Production Scheduling
 Production
 ```
 
-Production involves multiple stages, such as Woodwork, Metalwork, Painting, Electrical, Glass/Acrylic, Hardware Installation, Pre-assembly and Packing. As production progresses, the Factory can update the current stage and progress in ProjectNest, with photos optionally uploaded to provide additional progress evidence.
+Production is tracked independently across Carpentry, Painting, Glass, Metal, Electrical, Pre-assembly, and Packing & Shipping Workshops. As production progresses, the Factory can update the current stage and progress in ProjectNest, with photos optionally uploaded to provide additional progress evidence.
 
 ## Site Installation & Opening
 
@@ -180,7 +181,7 @@ These problems translate into the following core capabilities:
   Structured survey coordination      Survey Work Order and Survey
                                       Documents
 
-  Reliable drawing history            Drawing Sets and Revisions
+  Reliable drawing history            Drawing Revisions and Changes
 
   Controlled drawing changes          Local/Partial Changes and Full
                                       Drawing Updates
@@ -206,7 +207,9 @@ Drawing Management
 Production Visibility
 ```
 
-The MVP covers project management, site survey, drawing management and production visibility, supported by authentication, role-based access and operational history.
+The MVP covers project management, site survey, drawing management and production visibility, supported by authentication, simple RBAC and key operational history. Job Position is distinct from System Role. Recorded history covers project status changes, responsible Designer assignment changes, drawing revision updates and production progress changes; ordinary page views and button clicks are not recorded.
+
+SystemRole and JobPosition are separate predefined catalogs: Users may have multiple SystemRoles, while each User has exactly one JobPosition. Project assignment changes are retained in ProjectAssignment while Project.ResponsibleDesignerId remains the current-assignee reference. ProductionProgressHistory records status transitions without replacing the current ProductionStageProgress status or the independent ReworkRecord history. Each DrawingRevision has at least one associated StoredFile and may have multiple files.
 
 Engineering/site management, procurement, logistics, acceptance, maintenance, finance, notifications, client portal and analytics are deferred to later phases.
 
@@ -260,26 +263,32 @@ The core domain is organised around:
 
 ``` text
 Brand
-└── Project
-    ├── ProjectAssignment ─ User / Role
-    ├── SurveyWorkOrder ─ SurveyDocument
-    ├── DrawingSet
-    │   ├── DrawingRevision
-    │   └── DrawingChange
-    └── ProductionOrder
-        └── ProductionStageProgress ─ ProductionStage
+└── Store (Brand in Mall)
+    └── Project
+        ├── ProjectAssignment (responsible Designer history)
+        ├── SurveyWorkOrder
+        │   └── 0..* SurveyVisit
+        │       ├── SurveyPersonnel
+        │       └── 0..* SurveyVisitFile → StoredFile
+        ├── DrawingRevision (revision and change history)
+        │   └── 1..* DrawingRevisionFile → StoredFile
+        └── ProductionOrder
+            └── ProductionStageProgress ─ Workshop
+                ├── ProductionProgressHistory
+                └── ReworkRecord (separate rework history)
 ```
 
-Structured operational data is stored in **PostgreSQL**. CAD, PDF and
-image binaries are stored in private object storage, with file metadata
-retained in the database. Azure Blob Storage is the preferred cloud
-direction, while storage access should remain abstracted from the
-business layer.
+Structured operational data and `StoredFile` metadata are stored in
+**PostgreSQL**. CAD, PDF and image binaries are stored in the file system
+or equivalent storage. Storage access remains abstracted from the
+business layer; the MVP does not mandate a specific provider.
 
 Authentication uses **ASP.NET Core Identity with secure HttpOnly
-cookies** for the internal browser application. Authorization combines
-**role-based access control (RBAC)** with resource/project-based
-policies and follows least privilege.
+cookies** for the internal browser application. MVP authorization uses
+simple **role-based access control (RBAC)** with a predefined SystemRole
+catalog and many-to-many User assignments; users cannot create roles.
+JobPosition is a separate predefined business catalog, with exactly one
+required JobPosition per User.
 
 The frontend uses **React + TypeScript** with feature-oriented
 organisation. The API uses **REST/JSON**, DTOs, request validation,
@@ -306,9 +315,9 @@ strings are kept outside the repository.
   Backend             ASP.NET Core / C#
   ORM                 Entity Framework Core
   Database            PostgreSQL
-  File Storage        Azure Blob Storage / object storage
+  File Storage        File system / equivalent storage
   Authentication      ASP.NET Core Identity + secure cookie
-  Authorization       RBAC + resource/project-based policies
+  Authorization       Simple RBAC
   API                 REST / JSON
   API Documentation   OpenAPI / Swagger
   Source Control      Git / GitHub

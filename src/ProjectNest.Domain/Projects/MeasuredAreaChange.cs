@@ -6,9 +6,9 @@ public class MeasuredAreaChange
     public decimal? NewValue { get; }
     public Guid ChangedByUserId { get; }
     public DateTime ChangedAt { get; }
-    public string? Reason { get; }
+    public string Reason { get; }
 
-    internal MeasuredAreaChange(decimal? previousValue, decimal? newValue, Guid changedByUserId, DateTime changedAt, string? reason)
+    internal MeasuredAreaChange(decimal? previousValue, decimal? newValue, Guid changedByUserId, DateTime changedAt, string reason)
     {
         PreviousValue = previousValue;
         NewValue = newValue;

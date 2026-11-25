@@ -2,8 +2,8 @@ namespace ProjectNest.Domain.Production;
 
 public enum ProductionOrderStatus
 {
-    Active,
-    Paused,
+    Planned,
+    InProduction,
     Completed,
     Cancelled
 }

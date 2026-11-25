@@ -1,61 +1,123 @@
+using ProjectNest.Domain.Files;
+
 namespace ProjectNest.Domain.Surveys;
 
 public class SurveyWorkOrder
 {
+    private readonly List<SurveyVisit> visits = new();
+
     public Guid Id { get; private set; }
     public Guid ProjectId { get; private set; }
-    public DateOnly PlannedSurveyDate { get; private set; }
+    public SurveyType SurveyType { get; private set; }
+    public DateOnly? PlannedSurveyDate { get; private set; }
     public SurveyWorkOrderStatus Status { get; private set; }
+    public string? Notes { get; private set; }
+    public Guid? FinalSurveyReportFileId { get; private set; }
+    public IReadOnlyList<SurveyVisit> Visits => visits.AsReadOnly();
     public Guid CreatedByUserId { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public Guid UpdatedByUserId { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
-    public SurveyWorkOrder(Guid projectId, DateOnly plannedSurveyDate, Guid createdByUserId)
+    private SurveyWorkOrder()
+    {
+    }
+
+    public SurveyWorkOrder(Guid projectId, SurveyType surveyType, DateOnly? plannedSurveyDate, Guid createdByUserId, string? notes = null)
     {
         RequireId(projectId, nameof(projectId));
         RequireId(createdByUserId, nameof(createdByUserId));
-        RequirePlannedDate(plannedSurveyDate);
+        if (!Enum.IsDefined(surveyType))
+        {
+            throw new ArgumentException("A valid survey type is required.", nameof(surveyType));
+        }
+        if (plannedSurveyDate.HasValue)
+        {
+            RequirePlannedDate(plannedSurveyDate.Value);
+        }
 
         Id = Guid.NewGuid();
         ProjectId = projectId;
+        SurveyType = surveyType;
         PlannedSurveyDate = plannedSurveyDate;
-        // Application checks the Project's Mall contact details before dispatching survey work.
-        Status = SurveyWorkOrderStatus.Scheduled;
+        Notes = OptionalText(notes);
+        Status = SurveyWorkOrderStatus.Planned;
         CreatedByUserId = createdByUserId;
         UpdatedByUserId = createdByUserId;
         CreatedAt = DateTime.UtcNow;
         UpdatedAt = CreatedAt;
     }
 
-    public void ChangePlannedSurveyDate(DateOnly plannedSurveyDate, Guid updatedByUserId)
+    public void AddVisit(SurveyVisit visit)
     {
-        RequireScheduled();
-        RequirePlannedDate(plannedSurveyDate);
+        ArgumentNullException.ThrowIfNull(visit);
+        if (visit.SurveyWorkOrderId != Id)
+        {
+            throw new ArgumentException("The visit belongs to a different survey work order.", nameof(visit));
+        }
+        if (visits.Any(existing => existing.Id == visit.Id)) return;
+        visits.Add(visit);
+    }
+
+    public void AttachFinalSurveyReport(StoredFile file, Guid updatedByUserId)
+    {
+        ArgumentNullException.ThrowIfNull(file);
+        Touch(updatedByUserId);
+        FinalSurveyReportFileId = file.Id;
+    }
+
+    public void ChangePlannedSurveyDate(DateOnly? plannedSurveyDate, Guid updatedByUserId)
+    {
+        RequirePlanned();
+        if (plannedSurveyDate.HasValue)
+        {
+            RequirePlannedDate(plannedSurveyDate.Value);
+        }
         Touch(updatedByUserId);
         PlannedSurveyDate = plannedSurveyDate;
     }
 
-    // Completion is an explicit decision, independent of any visit's type or confirmation.
+    public void UpdateNotes(string? notes, Guid updatedByUserId)
+    {
+        RequirePlanned();
+        Touch(updatedByUserId);
+        Notes = OptionalText(notes);
+    }
+
+    public void Start(Guid updatedByUserId)
+    {
+        RequirePlanned();
+        Touch(updatedByUserId);
+        Status = SurveyWorkOrderStatus.InProgress;
+    }
+
     public void Complete(Guid updatedByUserId)
     {
-        RequireScheduled();
+        RequireNotTerminal();
         Touch(updatedByUserId);
         Status = SurveyWorkOrderStatus.Completed;
     }
 
     public void Cancel(Guid updatedByUserId)
     {
-        RequireScheduled();
+        RequireNotTerminal();
         Touch(updatedByUserId);
         Status = SurveyWorkOrderStatus.Cancelled;
     }
 
-    private void RequireScheduled()
+    private void RequirePlanned()
     {
-        if (Status != SurveyWorkOrderStatus.Scheduled)
+        if (Status != SurveyWorkOrderStatus.Planned)
         {
-            throw new InvalidOperationException("Only a scheduled survey work order can be changed.");
+            throw new InvalidOperationException("Only a planned survey work order can be changed or started.");
+        }
+    }
+
+    private void RequireNotTerminal()
+    {
+        if (Status is SurveyWorkOrderStatus.Completed or SurveyWorkOrderStatus.Cancelled)
+        {
+            throw new InvalidOperationException("A completed or cancelled survey work order cannot be changed.");
         }
     }
 
@@ -81,4 +143,6 @@ public class SurveyWorkOrder
             throw new ArgumentException("Planned survey date is required.", nameof(plannedSurveyDate));
         }
     }
+
+    private static string? OptionalText(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
