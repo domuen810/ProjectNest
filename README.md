@@ -68,8 +68,9 @@ The system is organised around business areas including Projects, Surveys, Drawi
 
 ### Frontend
 
-- React — planned
-- TypeScript — planned
+- React
+- TypeScript
+- Vite
 
 ### Engineering
 
@@ -90,6 +91,10 @@ ProjectNest/
 │   ├── requirements.md
 │   ├── technical-overview.md
 │   └── adr/
+├── frontend/
+│   ├── src/
+│   ├── package.json
+│   └── vite.config.ts
 ├── src/
 │   ├── ProjectNest.Api/
 │   ├── ProjectNest.Application/
@@ -120,6 +125,7 @@ Completed:
 - Backend solution and project structure
 - Initial dependency boundaries
 - ASP.NET Core API foundation
+- React + TypeScript frontend scaffold with Vite
 
 Next:
 
@@ -127,5 +133,4 @@ Next:
 - Initial domain implementation
 - API use cases
 - Automated testing
-- Frontend
 - CI/CD and deployment
